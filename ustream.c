@@ -90,6 +90,8 @@ static void ustream_free_buffers(struct ustream_buf_list *l)
 	l->head = NULL;
 	l->tail = NULL;
 	l->data_tail = NULL;
+	l->data_bytes = 0;
+	l->buffers = 0;
 }
 
 void ustream_free(struct ustream *s)
