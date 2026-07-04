@@ -179,7 +179,8 @@ static int timer_register(struct uloop_interval *tm, unsigned int msecs)
 	tm->priv.time.msecs = msecs;
 	tm->priv.time.fired = get_timestamp_us();
 
-	EV_SET(&ev, (uintptr_t)tm, EVFILT_TIMER, EV_ADD, NOTE_USECONDS, msecs * 1000, tm);
+	EV_SET(&ev, (uintptr_t)tm, EVFILT_TIMER, EV_ADD, NOTE_USECONDS,
+	       (int64_t)msecs * 1000, tm);
 
 	return kevent(poll_fd, &ev, 1, NULL, 0, NULL);
 }
@@ -197,9 +198,13 @@ static int64_t timer_next(struct uloop_interval *tm)
 {
 	int64_t t1 = tm->priv.time.fired;
 	int64_t t2 = get_timestamp_us();
+	int64_t step = (int64_t)tm->priv.time.msecs * 1000;
+
+	if (step <= 0)
+		return 0;
 
 	while (t1 < t2)
-		t1 += tm->priv.time.msecs * 1000;
+		t1 += step;
 
 	return (t1 - t2) / 1000;
 }
