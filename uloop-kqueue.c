@@ -55,7 +55,6 @@ static int register_kevent(struct uloop_fd *fd, unsigned int flags)
 	struct timespec timeout = { 0, 0 };
 	struct kevent ev[2];
 	int nev = 0;
-	unsigned int fl = 0;
 	unsigned int changed;
 	uint16_t kflags;
 
@@ -79,10 +78,7 @@ static int register_kevent(struct uloop_fd *fd, unsigned int flags)
 		EV_SET(&ev[nev++], fd->fd, EVFILT_WRITE, kflags, 0, 0, fd);
 	}
 
-	if (!flags)
-		fl |= EV_DELETE;
-
-	if (kevent(poll_fd, ev, nev, NULL, fl, &timeout) == -1)
+	if (kevent(poll_fd, ev, nev, NULL, 0, &timeout) == -1)
 		return -1;
 
 	return 0;
