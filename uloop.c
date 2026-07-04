@@ -61,11 +61,12 @@ static struct list_head processes = LIST_HEAD_INIT(processes);
 static struct list_head signals = LIST_HEAD_INIT(signals);
 
 /*
- * Entry the signal dispatch loop is about to visit. A callback may delete (and
- * free) an arbitrary sibling watcher; uloop_signal_delete() advances this so
- * the loop never dereferences a freed entry.
+ * Entries the signal and process dispatch loops are about to visit. A callback
+ * may delete (and free) an arbitrary sibling entry; the matching *_delete()
+ * advances these so the loops never dereference a freed entry.
  */
 static struct uloop_signal *signal_next;
+static struct uloop_process *process_next;
 
 static int poll_fd = -1;
 bool uloop_cancelled = false;
@@ -437,10 +438,21 @@ int uloop_process_add(struct uloop_process *p)
 	return 0;
 }
 
+static struct uloop_process *uloop_process_next_entry(struct uloop_process *p)
+{
+	if (list_is_last(&p->list, &processes))
+		return NULL;
+
+	return list_next_entry(p, list);
+}
+
 int uloop_process_delete(struct uloop_process *p)
 {
 	if (!p->pending)
 		return -1;
+
+	if (process_next == p)
+		process_next = uloop_process_next_entry(p);
 
 	list_del(&p->list);
 	p->pending = false;
@@ -450,7 +462,7 @@ int uloop_process_delete(struct uloop_process *p)
 
 static void uloop_handle_processes(void)
 {
-	struct uloop_process *p, *tmp;
+	struct uloop_process *p;
 	pid_t pid;
 	int ret;
 
@@ -462,9 +474,14 @@ static void uloop_handle_processes(void)
 			continue;
 
 		if (pid <= 0)
-			return;
+			break;
 
-		list_for_each_entry_safe(p, tmp, &processes, list) {
+		process_next = list_empty(&processes) ? NULL :
+			list_first_entry(&processes, struct uloop_process, list);
+
+		while ((p = process_next) != NULL) {
+			process_next = uloop_process_next_entry(p);
+
 			if (p->pid < pid)
 				continue;
 
@@ -476,6 +493,7 @@ static void uloop_handle_processes(void)
 		}
 	}
 
+	process_next = NULL;
 }
 
 int uloop_interval_set(struct uloop_interval *timer, unsigned int msecs)
