@@ -432,6 +432,12 @@ int udebug_buf_open(struct udebug_buf *buf, int fd, uint32_t ring_size, uint32_t
 	if (buf->ring_size > (1U << 24) || buf->data_size > (1U << 29))
 		return -1;
 
+	/* ring_size and data_size come from a peer and are used as power-of-two
+	 * masks when indexing the ring and data area; reject anything else. */
+	if (!buf->ring_size || (buf->ring_size & (buf->ring_size - 1)) ||
+	    !buf->data_size || (buf->data_size & (buf->data_size - 1)))
+		return -1;
+
 	if (__udebug_buf_map(buf, fd))
 		return -1;
 
