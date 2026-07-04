@@ -588,14 +588,31 @@ int uloop_signal_add(struct uloop_signal *s)
 
 int uloop_signal_delete(struct uloop_signal *s)
 {
+	struct uloop_signal *tmp;
+
 	if (!s->pending)
 		return -1;
 
 	list_del(&s->list);
 	s->pending = false;
 
-	if (s->orig.sa_handler != uloop_signal_wake)
-		sigaction(s->signo, &s->orig, NULL);
+	/* Only the first watcher registered for a signal saved the real
+	 * original disposition; later ones saved uloop_signal_wake. */
+	if (s->orig.sa_handler == uloop_signal_wake)
+		return 0;
+
+	list_for_each_entry(tmp, &signals, list) {
+		if (tmp->signo != s->signo)
+			continue;
+
+		/* Other watchers remain for this signal, hand the saved
+		 * disposition over to one of them so it can be restored once
+		 * the last watcher is removed. */
+		tmp->orig = s->orig;
+		return 0;
+	}
+
+	sigaction(s->signo, &s->orig, NULL);
 
 	return 0;
 }
